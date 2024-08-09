@@ -74,63 +74,67 @@ void CapiScreen::CreateAndInit(void) {
     //     OH_AVScreenCapture_SetStateCallback(capture, OnStateChange, nullptr);
     //     OH_AVScreenCapture_SetDataCallback(capture, OnBufferAvailable, nullptr);
 
-    //     // 可选 配置录屏旋转，此接口在感知到手机屏幕旋转时调用，如果手机的屏幕实际上没有发生旋转，调用接口是无效的。
-    //     OH_AVScreenCapture_SetCanvasRotation(capture, true);
-    //     // 可选 [过滤音频]
-    //     OH_AVScreenCapture_ContentFilter *contentFilter = OH_AVScreenCapture_CreateContentFilter();
-    //     // 添加过滤通知音
-    //     OH_AVScreenCapture_ContentFilter_AddAudioContent(contentFilter, OH_SCREEN_CAPTURE_NOTIFICATION_AUDIO);
-    //     // 排除过滤器
-    //     OH_AVScreenCapture_ExcludeContent(capture, contentFilter);
-    //
-    //     // 初始化录屏，传入配置信息OH_AVScreenRecorderConfig
-    //     OH_AudioCaptureInfo miccapinfo = {.audioSampleRate = 16000, .audioChannels = 2, .audioSource = OH_MIC};
-    //     OH_VideoCaptureInfo videocapinfo = {
-    //         .videoFrameWidth = 720, .videoFrameHeight = 1080, .videoSource = OH_VIDEO_SOURCE_SURFACE_RGBA};
-    //     OH_AudioInfo audioinfo = {
-    //         .micCapInfo = miccapinfo,
-    //     };
-    //     OH_VideoInfo videoinfo = {.videoCapInfo = videocapinfo};
-    //     OH_AVScreenCaptureConfig config = {.captureMode = OH_CAPTURE_HOME_SCREEN,
-    //                                        .dataType = OH_ORIGINAL_STREAM,
-    //                                        .audioInfo = audioinfo,
-    //                                        .videoInfo = videoinfo};
+    // 可选 配置录屏旋转，此接口在感知到手机屏幕旋转时调用，如果手机的屏幕实际上没有发生旋转，调用接口是无效的。
+    OH_AVScreenCapture_SetCanvasRotation(capture, true);
+    // 可选 [过滤音频]
+    OH_AVScreenCapture_ContentFilter *contentFilter = OH_AVScreenCapture_CreateContentFilter();
+    // 添加过滤通知音
+    OH_AVScreenCapture_ContentFilter_AddAudioContent(contentFilter, OH_SCREEN_CAPTURE_NOTIFICATION_AUDIO);
+    // 排除过滤器
+    OH_AVScreenCapture_ExcludeContent(capture, contentFilter);
 
-
-    OH_AVScreenCaptureConfig config;
-    OH_AudioCaptureInfo micCapInfo = {.audioSampleRate = 48000, .audioChannels = 2, .audioSource = OH_MIC};
-
-    OH_AudioCaptureInfo innerCapInfo = {.audioSampleRate = 48000, .audioChannels = 2, .audioSource = OH_ALL_PLAYBACK};
-
-    OH_AudioEncInfo audioEncInfo = {.audioBitrate = 48000, .audioCodecformat = OH_AudioCodecFormat::OH_AAC_LC};
-
-    OH_VideoCaptureInfo videoCapInfo = {
+    // 初始化录屏，传入配置信息OH_AVScreenRecorderConfig
+    OH_AudioCaptureInfo miccapinfo = {.audioSampleRate = 16000, .audioChannels = 2, .audioSource = OH_MIC};
+    OH_VideoCaptureInfo videocapinfo = {
         .videoFrameWidth = 720, .videoFrameHeight = 1080, .videoSource = OH_VIDEO_SOURCE_SURFACE_RGBA};
-
-    OH_VideoEncInfo videoEncInfo = {
-        .videoCodec = OH_VideoCodecFormat::OH_H264, .videoBitrate = 2000000, .videoFrameRate = 30};
-
-    OH_AudioInfo audioInfo = {.micCapInfo = micCapInfo, .innerCapInfo = innerCapInfo, .audioEncInfo = audioEncInfo};
-
-    OH_VideoInfo videoInfo = {.videoCapInfo = videoCapInfo, .videoEncInfo = videoEncInfo};
-
-    config = {
-        .captureMode = OH_CAPTURE_HOME_SCREEN,
-        .dataType = OH_CAPTURE_FILE,
-        .audioInfo = audioInfo,
-        .videoInfo = videoInfo,
+    OH_AudioInfo audioinfo = {
+        .micCapInfo = miccapinfo,
     };
+    OH_VideoInfo videoinfo = {.videoCapInfo = videocapinfo};
+    OH_AVScreenCaptureConfig config = {.captureMode = OH_CAPTURE_HOME_SCREEN,
+                                       .dataType = OH_ORIGINAL_STREAM,
+                                       .audioInfo = audioinfo,
+                                       .videoInfo = videoinfo};
 
-    // 初始化录屏参数，传入配置信息OH_AVScreenRecorderConfig
-    OH_RecorderInfo recorderInfo;
-    const std::string SCREEN_CAPTURE_ROOT = "/data/storage/el2/base/files/";
-    int32_t outputFd = open((SCREEN_CAPTURE_ROOT + "screen01.mp4").c_str(), O_RDWR | O_CREAT, 0777);
-    std::string fileUrl = "fd://" + std::to_string(outputFd);
-    recorderInfo.url = const_cast<char *>(fileUrl.c_str());
-    recorderInfo.fileFormat = OH_ContainerFormatType::CFT_MPEG_4;
-    config.recorderInfo = recorderInfo;
 
+    //     OH_AVScreenCaptureConfig config;
+    //     OH_AudioCaptureInfo micCapInfo = {.audioSampleRate = 48000, .audioChannels = 2, .audioSource = OH_MIC};
+    //
+    //     OH_AudioCaptureInfo innerCapInfo = {.audioSampleRate = 48000, .audioChannels = 2, .audioSource =
+    //     OH_ALL_PLAYBACK};
+    //
+    //     OH_AudioEncInfo audioEncInfo = {.audioBitrate = 48000, .audioCodecformat = OH_AudioCodecFormat::OH_AAC_LC};
+    //
+    //     OH_VideoCaptureInfo videoCapInfo = {
+    //         .videoFrameWidth = 720, .videoFrameHeight = 1080, .videoSource = OH_VIDEO_SOURCE_SURFACE_RGBA};
+    //
+    //     OH_VideoEncInfo videoEncInfo = {
+    //         .videoCodec = OH_VideoCodecFormat::OH_H264, .videoBitrate = 2000000, .videoFrameRate = 30};
+    //
+    //     OH_AudioInfo audioInfo = {.micCapInfo = micCapInfo, .innerCapInfo = innerCapInfo, .audioEncInfo =
+    //     audioEncInfo};
+    //
+    //     OH_VideoInfo videoInfo = {.videoCapInfo = videoCapInfo, .videoEncInfo = videoEncInfo};
+    //
+    //     config = {
+    //         .captureMode = OH_CAPTURE_HOME_SCREEN,
+    //         .dataType = OH_CAPTURE_FILE,
+    //         .audioInfo = audioInfo,
+    //         .videoInfo = videoInfo,
+    //     };
+    //
+    //     // 初始化录屏参数，传入配置信息OH_AVScreenRecorderConfig
+    //     OH_RecorderInfo recorderInfo;
+    //     const std::string SCREEN_CAPTURE_ROOT = "/data/storage/el2/base/files/";
+    //     int32_t outputFd = open((SCREEN_CAPTURE_ROOT + "screen01.mp4").c_str(), O_RDWR | O_CREAT, 0777);
+    //     std::string fileUrl = "fd://" + std::to_string(outputFd);
+    //     recorderInfo.url = const_cast<char *>(fileUrl.c_str());
+    //     recorderInfo.fileFormat = OH_ContainerFormatType::CFT_MPEG_4;
+    //     config.recorderInfo = recorderInfo;
+
+    OH_AVScreenCapture_SetErrorCallback(capture, OnError, nullptr);
     OH_AVScreenCapture_SetStateCallback(capture, OnStateChange, nullptr);
+    OH_AVScreenCapture_SetDataCallback(capture, OnBufferAvailable, nullptr);
 
     int32_t retInit = OH_AVScreenCapture_Init(capture, config);
     OH_LOG_DEBUG(LOG_APP, "wangz::END::OH_AVScreenCapture_Init::%{public}d", retInit);
@@ -142,7 +146,7 @@ void CapiScreen::Start(void) {
     int32_t retStart = OH_AVScreenCapture_StartScreenCapture(capture);
     OH_LOG_DEBUG(LOG_APP, "wangz::OH_AVScreenCapture_StartScreenCapture::%{public}d", retStart);
     // mic开关设置
-    OH_AVScreenCapture_SetMicrophoneEnabled(capture, true);
+    //     OH_AVScreenCapture_SetMicrophoneEnabled(capture, true);
     OH_LOG_DEBUG(LOG_APP, "wangz::END::Start");
 }
 
