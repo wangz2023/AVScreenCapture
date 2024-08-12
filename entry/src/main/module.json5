@@ -32,6 +32,15 @@
             ]
           }
         ]
+      },
+      {
+        "name": "EntryAbility2",
+        "srcEntry": "./ets/entryability2/EntryAbility2.ets",
+        "description": "$string:EntryAbility2_desc",
+        "icon": "$media:layered_image",
+        "label": "$string:EntryAbility2_label",
+        "startWindowIcon": "$media:startIcon",
+        "startWindowBackground": "$color:start_window_background"
       }
     ],
     "extensionAbilities": [
@@ -48,27 +57,55 @@
         ],
       }
     ],
-    "requestPermissions": [{
-      "name": "ohos.permission.MICROPHONE",
-      "reason": "$string:mic_reason",
-      "usedScene": {
-        "abilities": ["EntryAbility"],
-        "when": "inuse"
+    "requestPermissions": [
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING",
+        "reason": "$string:mic_reason",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility",
+            "EntryAbility2",
+            "EntryBackupAbility"
+          ],
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.MICROPHONE",
+        "reason": "$string:mic_reason",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility",
+            "EntryAbility2",
+            "EntryBackupAbility"
+          ],
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.CAMERA",
+        "reason": "$string:mic_reason",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility",
+            "EntryAbility2",
+            "EntryBackupAbility"
+          ],
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.INTERNET",
+        "reason": "$string:network",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility",
+            "EntryAbility2",
+            "EntryBackupAbility"
+          ],
+          "when": "always"
+        }
       }
-    }, {
-      "name": "ohos.permission.CAMERA",
-      "reason": "$string:mic_reason",
-      "usedScene": {
-        "abilities": ["EntryAbility"],
-        "when": "inuse"
-      }
-    }, {
-      "name": "ohos.permission.INTERNET",
-      "reason": "$string:network",
-      "usedScene": {
-        "abilities": ["EntryAbility"],
-        "when": "inuse"
-      }
-    }]
+    ]
   }
 }

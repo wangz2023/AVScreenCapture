@@ -37,15 +37,22 @@
 #include <vector>
 #include <native_buffer/native_buffer.h>
 #include "iostream"
+#include "fstream"
 
 #include "napi/native_api.h"
 #include "hilog/log.h"
 #undef LOG_DOMAIN
 #undef LOG_TAG
-#define LOG_DOMAIN 0x3200  // 全局domain宏，标识业务领域
-#define LOG_TAG "wangz::"   // 全局tag宏，标识模块日志tag
+#define LOG_DOMAIN 0x3200 // 全局domain宏，标识业务领域
+#define LOG_TAG "wangz::" // 全局tag宏，标识模块日志tag
 
 namespace OHOS_SCREEN_SAMPLE {
+
+struct OnBufferAvailableData{
+    std::unique_ptr<std::ofstream> &outputFileRef;
+    OH_AVCodec *codec;
+};
+
 class CapiScreen {
 public:
     ~CapiScreen();
@@ -53,13 +60,17 @@ public:
     void Test(void);
     void CreateAndInit(void);
     void Start(void);
+    void StartWithSurfaceMode(void);
     void StopAndRelease(void);
+    void StopAndReleaseWithSurfaceMode(void);
 
 private:
-    bool  isRunning = false;
+    bool isRunning = false;
     CapiScreen(const CapiScreen &) = delete;
     CapiScreen &operator=(const CapiScreen &) = delete;
     OH_AVScreenCapture *capture;
+    OH_AVCodec *codec;
+    std::unique_ptr<std::ofstream> outputFile = std::make_unique<std::ofstream>();
 };
 } // namespace OHOS_SCREEN_SAMPLE
 #endif

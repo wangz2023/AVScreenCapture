@@ -48,7 +48,7 @@ struct Index {
 //       wants: [
 //         {
 //           bundleName: "com.example.myapplication",
-//           abilityName: "com.example.myapplication.EntryAbility2"
+//           abilityName: "com.example.myapplication.EntryAbility"
 //         }
 //       ],
 //       // 指定点击通知栏消息后的动作是拉起ability

@@ -94,6 +94,7 @@ static napi_value Init(napi_env env, napi_value exports) {
         {"add", nullptr, Add, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"screenTest", nullptr, ScreenTest, nullptr, nullptr, nullptr, napi_default, nullptr}};
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+//     NativeXComponentSample::PluginManager::GetInstance()->Export(env, exports);
     return exports;
 }
 EXTERN_C_END
