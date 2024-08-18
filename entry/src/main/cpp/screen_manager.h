@@ -16,10 +16,14 @@
 #ifndef OHOS_SCREEN_SAMPLE_H
 #define OHOS_SCREEN_SAMPLE_H
 
+#include <multimedia/player_framework/native_avcodec_videoencoder.h>
+#include <multimedia/player_framework/native_avcapability.h>
+#include <multimedia/player_framework/native_avcodec_base.h>
+#include <multimedia/player_framework/native_avformat.h>
+#include <multimedia/player_framework/native_avbuffer.h>
 #include <multimedia/player_framework/native_avscreen_capture_base.h>
 #include <multimedia/player_framework/native_avscreen_capture.h>
 #include <multimedia/player_framework/native_avscreen_capture_errors.h>
-#include <multimedia/player_framework/native_avbuffer.h>
 #include <fcntl.h>
 #include "string"
 #include "unistd.h"
@@ -46,31 +50,5 @@
 #define LOG_DOMAIN 0x3200 // 全局domain宏，标识业务领域
 #define LOG_TAG "wangz::" // 全局tag宏，标识模块日志tag
 
-namespace OHOS_SCREEN_SAMPLE {
-
-struct OnBufferAvailableData{
-    std::unique_ptr<std::ofstream> &outputFileRef;
-    OH_AVCodec *codec;
-};
-
-class CapiScreen {
-public:
-    ~CapiScreen();
-    CapiScreen();
-    void Test(void);
-    void CreateAndInit(void);
-    void Start(void);
-    void StartWithSurfaceMode(void);
-    void StopAndRelease(void);
-    void StopAndReleaseWithSurfaceMode(void);
-
-private:
-    bool isRunning = false;
-    CapiScreen(const CapiScreen &) = delete;
-    CapiScreen &operator=(const CapiScreen &) = delete;
-    OH_AVScreenCapture *capture;
-    OH_AVCodec *codec;
-    std::unique_ptr<std::ofstream> outputFile = std::make_unique<std::ofstream>();
-};
-} // namespace OHOS_SCREEN_SAMPLE
+namespace OHOS_SCREEN_SAMPLE {} // namespace OHOS_SCREEN_SAMPLE
 #endif

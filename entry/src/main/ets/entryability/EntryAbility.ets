@@ -4,7 +4,11 @@ import { window } from '@kit.ArkUI';
 import { abilityAccessCtrl, common, Permissions } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 
-const permissions: Array<Permissions> = ['ohos.permission.MICROPHONE'];
+const permissions: Array<Permissions> = [
+  'ohos.permission.CAMERA',
+  'ohos.permission.MICROPHONE',
+  'ohos.permission.READ_MEDIA',
+  'ohos.permission.WRITE_MEDIA'];
 
 // 使用UIExtensionAbility：将common.UIAbilityContext 替换为common.UIExtensionContext
 function reqPermissionsFromUser(permissions: Array<Permissions>, context: common.UIAbilityContext): void {
