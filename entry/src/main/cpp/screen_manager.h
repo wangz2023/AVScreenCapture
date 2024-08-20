@@ -31,6 +31,14 @@
 #include <multimedia/player_framework/native_avcapability.h>
 #include <multimedia/player_framework/native_avcodec_base.h>
 #include <multimedia/player_framework/native_avcodec_videoencoder.h>
+
+#include <multimedia/player_framework/native_avcodec_audiocodec.h>
+#include <multimedia/native_audio_channel_layout.h>
+#include <multimedia/player_framework/native_avcapability.h>
+#include <multimedia/player_framework/native_avcodec_base.h>
+#include <multimedia/player_framework/native_avformat.h>
+#include <multimedia/player_framework/native_avbuffer.h>
+
 #include <unistd.h>
 #include <string>
 #include <thread>

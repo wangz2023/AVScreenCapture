@@ -1,5 +1,6 @@
 #include "napi/native_api.h"
 #include "screen_manager.h"
+#include <mutex>
 #include <queue>
 #include <hilog/log.h>
 #include <fcntl.h>
@@ -14,6 +15,7 @@ using namespace std::chrono_literals;
 bool isRunning = false;
 OH_AVScreenCapture *capture;
 OH_AVCodec *codec;
+OH_AVCodec *micCodec;
 
 std::string_view outputFilePath = "/data/storage/el2/base/haps/entry/files/screen01.mp4";
 std::unique_ptr<std::ofstream> outputFile = std::make_unique<std::ofstream>();
@@ -57,6 +59,22 @@ struct OnBufferAvailableData {
     OH_AVCodec *codec;
 };
 
+// 初始化队列
+class AEncBufferSignal {
+public:
+    std::mutex inMutex_;
+    std::mutex outMutex_;
+    std::mutex startMutex_;
+    std::condition_variable inCond_;
+    std::condition_variable outCond_;
+    std::condition_variable startCond_;
+    std::queue<uint32_t> inQueue_;
+    std::queue<uint32_t> outQueue_;
+    std::queue<OH_AVBuffer *> inBufferQueue_;
+    std::queue<OH_AVBuffer *> outBufferQueue_;
+};
+AEncBufferSignal *signal_ = new AEncBufferSignal();
+
 bool isFirstFrame = true;
 int32_t qpAverage = 20;
 double mseValue = 0.0;
@@ -93,7 +111,7 @@ static void OnStateChange(struct OH_AVScreenCapture *capture, OH_AVScreenCapture
 
 static void OnBufferAvailable(OH_AVScreenCapture *capture, OH_AVBuffer *buffer, OH_AVScreenCaptureBufferType bufferType,
                               int64_t timestamp, void *userData) {
-    //         OH_LOG_DEBUG(LOG_APP, "wangz::OnBufferAvailable");
+    OH_LOG_DEBUG(LOG_APP, "wangz::OnBufferAvailable");
     // 获取解码后信息 可以参考编解码接口
     int bufferLen = OH_AVBuffer_GetCapacity(buffer);
     OH_NativeBuffer *nativeBuffer = OH_AVBuffer_GetNativeBuffer(buffer);
@@ -103,13 +121,44 @@ static void OnBufferAvailable(OH_AVScreenCapture *capture, OH_AVBuffer *buffer, 
     uint8_t *buf = OH_AVBuffer_GetAddr(buffer);
     if (bufferType == OH_SCREEN_CAPTURE_BUFFERTYPE_VIDEO) {
         // 处理视频buffer
-        //             OH_LOG_DEBUG(LOG_APP, "wangz::OH_SCREEN_CAPTURE_BUFFERTYPE_VIDEO");
+        OH_LOG_DEBUG(LOG_APP, "wangz::OH_SCREEN_CAPTURE_BUFFERTYPE_VIDEO");
     } else if (bufferType == OH_SCREEN_CAPTURE_BUFFERTYPE_AUDIO_INNER) {
         // 处理内录buffer
-        //             OH_LOG_DEBUG(LOG_APP, "wangz::OH_SCREEN_CAPTURE_BUFFERTYPE_AUDIO_INNER");
+        OH_LOG_DEBUG(LOG_APP, "wangz::OH_SCREEN_CAPTURE_BUFFERTYPE_AUDIO_INNER");
     } else if (bufferType == OH_SCREEN_CAPTURE_BUFFERTYPE_AUDIO_MIC) {
         // 处理麦克风buffer
-        //             OH_LOG_DEBUG(LOG_APP, "wangz::OH_SCREEN_CAPTURE_BUFFERTYPE_AUDIO_MIC");
+        OH_LOG_DEBUG(LOG_APP, "wangz::OH_SCREEN_CAPTURE_BUFFERTYPE_AUDIO_MIC");
+        // 每帧样点数
+        int32_t DEFAULT_SAMPLERATE = 48000;
+        int32_t TIME_PER_FRAME = 0.02;
+        int32_t SAMPLES_PER_FRAME = DEFAULT_SAMPLERATE * TIME_PER_FRAME;
+        // 声道数，对于amr编码声道数只支持单声道的音频输入
+        int32_t DEFAULT_CHANNEL_COUNT = 2;
+        // 每帧输入数据的长度，声道数 * 每帧样点数 * 每个样点的字节数（以采样格式SAMPLE_S16LE为例）
+        int32_t INPUT_FRAME_BYTES = DEFAULT_CHANNEL_COUNT * SAMPLES_PER_FRAME * sizeof(short);
+
+        AEncBufferSignal *signal = static_cast<AEncBufferSignal *>(userData);
+
+        std::unique_lock<std::mutex> lock(signal->inMutex_);
+        signal->inCond_.wait(lock, [&]() { return (signal->inQueue_.size() > 0); });
+        OH_LOG_DEBUG(LOG_APP, "wangz::OnBufferAvailable::debug::1");
+        uint32_t index = signal->inQueue_.front();
+        auto micBuffer = signal->inBufferQueue_.front();
+        OH_LOG_DEBUG(LOG_APP, "wangz::OnBufferAvailable::debug::2");
+        memcpy(OH_AVBuffer_GetAddr(micBuffer), buffer, bufferLen);
+        OH_AVCodecBufferAttr attr = {0};
+        attr.size = bufferLen;
+        OH_AVErrCode ret = OH_AVBuffer_SetBufferAttr(micBuffer, &attr);
+        if (ret != AV_ERR_OK) {
+            OH_LOG_DEBUG(LOG_APP, "wangz::OH_AVBuffer_SetBufferAttr::%{public}d", ret);
+        }
+        // 送入编码输入队列进行编码, index为对应队列下标
+        ret = OH_AudioCodec_PushInputBuffer(micCodec, index);
+        if (ret != AV_ERR_OK) {
+            OH_LOG_DEBUG(LOG_APP, "wangz::OH_AudioCodec_PushInputBuffer::%{public}d", ret);
+        }
+        signal->inQueue_.pop();
+        signal->inBufferQueue_.pop();
     }
 };
 
@@ -141,9 +190,9 @@ void CreateAndInitWithSurfaceMode(void) {
         .audioInfo = audioInfo,
         .videoInfo = videoInfo,
     };
-    OH_AVScreenCapture_SetErrorCallback(capture, OnError, nullptr);
-    OH_AVScreenCapture_SetStateCallback(capture, OnStateChange, nullptr);
-    OH_AVScreenCapture_SetDataCallback(capture, OnBufferAvailable, nullptr);
+    OH_AVScreenCapture_SetErrorCallback(capture, OnError, signal_);
+    OH_AVScreenCapture_SetStateCallback(capture, OnStateChange, signal_);
+    OH_AVScreenCapture_SetDataCallback(capture, OnBufferAvailable, signal_);
 
     // 初始化录屏参数，传入配置信息OH_AVScreenRecorderConfig
     //     OH_RecorderInfo recorderInfo;
@@ -286,10 +335,144 @@ static void OnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *bu
     }
 }
 
+
+// OH_AVCodecOnStreamChanged回调函数的实现
+static void OnOutputFormatChanged(OH_AVCodec *codec, OH_AVFormat *format, void *userData) {
+    OH_LOG_DEBUG(LOG_APP, "wangz::OnOutputFormatChanged::");
+    (void)codec;
+    (void)format;
+    (void)userData;
+}
+// OH_AVCodecOnNeedInputBuffer回调函数的实现
+static void OnInputBufferAvailable(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *data, void *userData) {
+    OH_LOG_DEBUG(LOG_APP, "wangz::OnInputBufferAvailable::START");
+    (void)codec;
+    // 编码输入码流送入InputBuffer队列
+    AEncBufferSignal *signal = static_cast<AEncBufferSignal *>(userData);
+    std::unique_lock<std::mutex> lock(signal->inMutex_);
+    signal->inQueue_.push(index);
+    signal->inBufferQueue_.push(data);
+    signal->inCond_.notify_all();
+    OH_LOG_DEBUG(LOG_APP, "wangz::OnInputBufferAvailable::END");
+}
+// OH_AVCodecOnNewOutputBuffer回调函数的实现
+static void OnOutputBufferAvailable(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *data, void *userData) {
+    OH_LOG_DEBUG(LOG_APP, "wangz::OnOutput::START");
+    (void)codec;
+    // 将对应输出buffer的index送入OutputQueue_队列
+    // 将对应编码完成的数据data送入outBuffer队列
+    AEncBufferSignal *signal = static_cast<AEncBufferSignal *>(userData);
+    std::unique_lock<std::mutex> lock(signal->outMutex_);
+    signal->outQueue_.push(index);
+    signal->outBufferQueue_.push(data);
+    signal->outCond_.notify_all();
+    OH_LOG_DEBUG(LOG_APP, "wangz::OnOutput::END");
+}
+
+
+int32_t ret;
+// 配置音频采样率（必须）
+constexpr uint32_t DEFAULT_SAMPLERATE = 44100;
+// 配置音频码率（必须）
+constexpr uint64_t DEFAULT_BITRATE = 32000;
+// 配置音频声道数（必须）
+constexpr uint32_t DEFAULT_CHANNEL_COUNT = 2;
+// 配置音频声道类型（必须）
+constexpr OH_AudioChannelLayout CHANNEL_LAYOUT = OH_AudioChannelLayout::CH_LAYOUT_STEREO;
+// 配置音频位深（必须）
+constexpr OH_BitsPerSample SAMPLE_FORMAT = OH_BitsPerSample::SAMPLE_S16LE;
+// 配置音频compliance level (默认值0，取值范围-2~2)
+constexpr int32_t COMPLIANCE_LEVEL = 0;
+// 配置音频精度（必须） SAMPLE_S16LE
+constexpr OH_BitsPerSample BITS_PER_CODED_SAMPLE = OH_BitsPerSample::SAMPLE_S16LE;
+// 每20ms一帧音频数据
+constexpr float TIME_PER_FRAME = 0.02;
+// 配置最大输入长度, 每帧音频数据的大小（可选）
+constexpr uint32_t DEFAULT_MAX_INPUT_SIZE =
+    DEFAULT_SAMPLERATE * TIME_PER_FRAME * DEFAULT_CHANNEL_COUNT * sizeof(short); // aac
+
+
+void StartMic(void) {
+    OH_AVCapability *capability = OH_AVCodec_GetCapability(OH_AVCODEC_MIMETYPE_AUDIO_AAC, true);
+    const char *name = OH_AVCapability_GetName(capability);
+    micCodec = OH_AudioCodec_CreateByName(name);
+
+    //     signal_ = new AEncBufferSignal();
+    OH_AVCodecCallback cb_ = {&OnError, &OnOutputFormatChanged, &OnInputBufferAvailable, &OnOutputBufferAvailable};
+    // 配置异步回调
+    int32_t ret = OH_AudioCodec_RegisterCallback(micCodec, cb_, signal_);
+    if (ret != AV_ERR_OK) {
+        OH_LOG_DEBUG(LOG_APP, "wangz::OH_AudioCodec_RegisterCallback::%{public}d", ret);
+    }
+
+    OH_AVFormat *format = OH_AVFormat_Create();
+    // 写入format
+    OH_AVFormat_SetIntValue(format, OH_MD_KEY_AUD_CHANNEL_COUNT, DEFAULT_CHANNEL_COUNT);
+    OH_AVFormat_SetIntValue(format, OH_MD_KEY_AUD_SAMPLE_RATE, DEFAULT_SAMPLERATE);
+    OH_AVFormat_SetLongValue(format, OH_MD_KEY_BITRATE, DEFAULT_BITRATE);
+    OH_AVFormat_SetIntValue(format, OH_MD_KEY_AUDIO_SAMPLE_FORMAT, SAMPLE_FORMAT);
+    OH_AVFormat_SetLongValue(format, OH_MD_KEY_CHANNEL_LAYOUT, CHANNEL_LAYOUT);
+    OH_AVFormat_SetIntValue(format, OH_MD_KEY_MAX_INPUT_SIZE, DEFAULT_MAX_INPUT_SIZE);
+    // 配置编码器
+    ret = OH_AudioCodec_Configure(micCodec, format);
+    if (ret != AV_ERR_OK) {
+        OH_LOG_DEBUG(LOG_APP, "wangz::OH_AudioCodec_Configure::%{public}d", ret);
+    }
+
+    ret = OH_AudioCodec_Prepare(micCodec);
+    if (ret != AV_ERR_OK) {
+        OH_LOG_DEBUG(LOG_APP, "wangz::OH_AudioCodec_Prepare::%{public}d", ret);
+    }
+
+    // 开始编码
+    ret = OH_AudioCodec_Start(micCodec);
+    if (ret != AV_ERR_OK) {
+        OH_LOG_DEBUG(LOG_APP, "wangz::OH_AudioCodec_Start::%{public}d", ret);
+    }
+
+    std::unique_ptr<std::thread> micEncOutputThread_ = std::make_unique<std::thread>([&]() {
+        while (true) {
+            OH_LOG_DEBUG(LOG_APP, "wangz::out::debug::1");
+            std::unique_lock<std::mutex> lock(signal_->outMutex_);
+            signal_->outCond_.wait(lock, [&]() { return (signal_->outQueue_.size() > 0); });
+            OH_LOG_DEBUG(LOG_APP, "wangz::out::debug::2");
+            uint32_t index = signal_->outQueue_.front();
+            OH_AVBuffer *avBuffer = signal_->outBufferQueue_.front();
+            OH_AVCodecBufferAttr attr = {0};
+            OH_LOG_DEBUG(LOG_APP, "wangz::out::debug::3");
+            if (OH_AVBuffer_GetBufferAttr(avBuffer, &attr) != AV_ERR_OK) {
+                OH_LOG_ERROR(LOG_APP, "wangz::OutputFunc GetBufferAttr error");
+            }
+            OH_LOG_DEBUG(LOG_APP, "wangz::out::debug::4");
+            //         size += attr.size;
+            void *buffer_data = std::malloc(attr.size);
+            memcpy(buffer_data, OH_AVBuffer_GetAddr(avBuffer), attr.size);
+            OH_LOG_INFO(LOG_APP, "wangz::MIC index: %{public}d, flags: %{public}d size: %{public}d", index, attr.flags,
+                        attr.size);
+            //         PLAudioFrame *dataToPass = new PLAudioFrame{buffer_data, index, attr.size, attr.pts / 1000,
+            //         attr.flags}; encodeResultCallback(dataToPass);
+            if (OH_AudioCodec_FreeOutputBuffer(micCodec, index) != AV_ERR_OK) {
+                OH_LOG_ERROR(LOG_APP, "wangz::Fatal: FreeOutputData fail");
+                break;
+            }
+            OH_LOG_DEBUG(LOG_APP, "wangz::out::debug::5");
+            signal_->outBufferQueue_.pop();
+            signal_->outQueue_.pop();
+            OH_LOG_DEBUG(LOG_APP, "wangz::out::debug::6");
+            if (attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
+                OH_LOG_ERROR(LOG_APP, "wangz::decode eos");
+                //             isRunning_.store(false);
+                signal_->startCond_.notify_all();
+            }
+            OH_LOG_DEBUG(LOG_APP, "wangz::out::debug::7");
+        }
+    });
+    micEncOutputThread_->detach();
+}
+
 void StartWithSurfaceMode(void) {
     OH_LOG_DEBUG(LOG_APP, "wangz::StartWithSurfaceMode");
     // 通过 MIME TYPE 创建编码器，系统会根据MIME创建最合适的编码器。
-
     OH_AVCapability *capability = OH_AVCodec_GetCapability(OH_AVCODEC_MIMETYPE_VIDEO_AVC, true);
     const char *codecName = OH_AVCapability_GetName(capability);
     codec = OH_VideoEncoder_CreateByName(codecName);
@@ -376,6 +559,7 @@ void Test(void) {
         {
             CreateAndInitWithSurfaceMode();
             StartWithSurfaceMode();
+            StartMic();
             isRunning = true;
         }
     } else {

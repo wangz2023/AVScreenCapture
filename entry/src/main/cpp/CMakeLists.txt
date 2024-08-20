@@ -18,4 +18,5 @@ target_link_libraries(entry PUBLIC libace_napi.z.so
                                     libnative_media_core.so
                                     libnative_buffer.so
                                     libnative_media_codecbase.so
-                                    libnative_media_venc.so)
+                                    libnative_media_venc.so
+                                    libnative_media_acodec.so)

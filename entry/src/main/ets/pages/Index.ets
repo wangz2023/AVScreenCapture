@@ -80,7 +80,7 @@ struct Index {
 //       wants: [
 //         {
 //           bundleName: "com.example.myapplication",
-//           abilityName: "com.example.myapplication.EntryAbility2"
+//           abilityName: "com.example.myapplication.EntryAbility"
 //         }
 //       ],
 //       // 指定点击通知栏消息后的动作是拉起ability
@@ -96,6 +96,7 @@ struct Index {
 //       backgroundTaskManager.startBackgroundRunning(this.context,
 //         backgroundTaskManager.BackgroundMode.AUDIO_RECORDING, wantAgentObj).then(() => {
 //         console.info(`wangz::Succeeded in operationing startBackgroundRunning.`);
+//         hilog.info(0x0000, "wangz::", 'screenTest1111111::' + testNapi.screenTest());
 //       }).catch((err: BusinessError) => {
 //         console.error(`wangz::Failed to operation startBackgroundRunning. Code is ${err.code}, message is ${err.message}`);
 //       });
@@ -105,6 +106,7 @@ struct Index {
 //   stopContinuousTask() {
 //     backgroundTaskManager.stopBackgroundRunning(this.context).then(() => {
 //       console.info(`wangz::Succeeded in operationing stopBackgroundRunning.`);
+//       hilog.info(0x0000, "wangz::", 'screenTest1111111::' + testNapi.screenTest());
 //     }).catch((err: BusinessError) => {
 //       console.error(`wangz::Failed to operation stopBackgroundRunning. Code is ${err.code}, message is ${err.message}`);
 //     });
@@ -141,9 +143,6 @@ struct Index {
 //         .width(250)
 //         .height(40)
 //         .onClick(() => {
-//           // 此处结束具体的长时任务的执行
-//
-//           // 通过按钮取消长时任务
 //           this.stopContinuousTask();
 //         })
 //       }
